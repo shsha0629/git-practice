@@ -1,5 +1,5 @@
 def main():
-    print("Hello from git-practice!")
+    print("Hello from pandas-mission!")
 
 
 if __name__ == "__main__":
