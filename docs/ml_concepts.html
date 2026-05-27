@@ -329,6 +329,48 @@
       margin-top: 8px;
       font-family: monospace;
     }
+
+    .table-wrap { 
+      margin-top: 12px; 
+      overflow-x: auto; 
+    }
+
+    table { 
+      width: 100%; 
+      border-collapse: collapse; 
+      font-size: 13px; 
+    }
+
+    th { 
+      background: var(--bg2); 
+      color: var(--text2); 
+      font-weight: 500; 
+      padding: 8px 12px; 
+      text-align: center; 
+      font-size: 11px; 
+      border-bottom: 1px solid var(--border); 
+    }
+
+    td { 
+      padding: 8px 12px; 
+      text-align: center; 
+      border-bottom: 1px solid var(--border); 
+      color: var(--text); 
+    }
+
+    tr.total-row td { 
+      font-weight: 600; 
+      background: var(--bg2); 
+    }
+
+    .td-err { 
+      color: var(--coral); 
+    }
+
+    .td-sq  { 
+      color: var(--purple); 
+    }
+
   </style>
 </head>
 <body>
@@ -356,6 +398,11 @@
         <div class="menu-card-title">결정계수 R²</div>
         <div class="menu-card-desc">모델의 설명력, SS_res / SS_tot, 0~1 사이 값</div>
         <div class="menu-card-url">#r2</div>
+      </a>
+      <a class="menu-card" href="#mse">
+        <div class="menu-card-title">MSE (평균 제곱 오차)</div>
+        <div class="menu-card-desc">오차를 제곱하는 이유, 계산 방법, 최솟값 찾기</div>
+        <div class="menu-card-url">#mse</div>
       </a>
     </div>
   </div>
@@ -446,6 +493,31 @@
     <div class="stat-row" id="r2-stats"></div>
     <div id="r2-formula"></div>
     <div class="explain-box" id="r2-explain"></div>
+  </div>
+
+  <div id="page-mse" class="graph-section">
+    <h2>MSE (평균 제곱 오차)</h2>
+    <p class="subtitle">모델 예측의 오차를 하나의 숫자로 표현하는 방법</p>
+    <div class="tab-row" id="mse-tabs"></div>
+    <div class="canvas-wrap">
+      <canvas id="mse-chart" role="img" aria-label="MSE 설명 그래프"></canvas>
+    </div>
+    <div id="mse-slider-area" style="display:none;">
+      <div class="sl-row">
+        <label>예측선 기울기</label>
+        <input type="range" id="mse-slope" min="0.3" max="1.5" step="0.05" value="0.9">
+        <span class="sl-val" id="mse-slope-v">0.90</span>
+      </div>
+      <div class="sl-row">
+        <label>예측선 절편</label>
+        <input type="range" id="mse-intercept" min="-2" max="4" step="0.1" value="1.0">
+        <span class="sl-val" id="mse-intercept-v">1.0</span>
+      </div>
+    </div>
+    <div id="mse-table-area"></div>
+    <div class="stat-row" id="mse-stats"></div>
+    <div id="mse-formula"></div>
+    <div class="explain-box" id="mse-explain"></div>
   </div>
 
   <script>
@@ -939,6 +1011,209 @@
           if (r2Tab === 3) R2TABS[3].render(parseFloat(this.value)); 
         });
         setR2Tab(0);
+      }
+
+      // MSE
+      if (param === 'mse') {
+        const MSE_DATA = [
+          { x: 1, y: 2 }, { x: 2, y: 3.5 }, { x: 3, y: 3 },
+          { x: 4, y: 5 }, { x: 5, y: 6 },   { x: 6, y: 7.5 }, { x: 7, y: 8 }
+        ];
+
+        function mseOptLine() {
+          const n = MSE_DATA.length;
+          const mx = MSE_DATA.reduce((s,p) => s+p.x, 0) / n;
+          const my = MSE_DATA.reduce((s,p) => s+p.y, 0) / n;
+          let num = 0, den = 0;
+          MSE_DATA.forEach(p => { num += (p.x-mx)*(p.y-my); den += (p.x-mx)**2; });
+          const m = num/den, b = my - m*mx;
+          return { m: parseFloat(m.toFixed(3)), b: parseFloat(b.toFixed(3)) };
+        }
+        const OPT = mseOptLine();
+
+        function mseCalcRows(m, b) {
+          return MSE_DATA.map(p => ({
+            x: p.x, actual: p.y,
+            pred: parseFloat((m*p.x+b).toFixed(2)),
+            err:  parseFloat((m*p.x+b - p.y).toFixed(2)),
+            sq:   parseFloat(((m*p.x+b - p.y)**2).toFixed(2))
+          }));
+        }
+        function mseMean(rows) {
+          return parseFloat((rows.reduce((s,r) => s+r.sq, 0) / rows.length).toFixed(2));
+        }
+        function mseErrLineDS(rows) {
+          return rows.map(r => ({
+            type:'line', data:[{x:r.x, y:r.actual},{x:r.x, y:r.pred}],
+            borderColor:'rgba(211,84,0,0.55)', borderWidth:2,
+            pointRadius:0, fill:false, borderDash:[4,3]
+          }));
+        }
+        function mseSqBoxDS(rows) {
+          return rows.map(r => {
+            const err = r.pred - r.actual, side = Math.abs(err);
+            const xDir = err >= 0 ? 1 : -1;
+            const x2 = r.x + side * xDir * 0.35;
+            return {
+              type:'line',
+              data:[{x:r.x,y:r.actual},{x:x2,y:r.actual},{x:x2,y:r.pred},{x:r.x,y:r.pred},{x:r.x,y:r.actual}],
+              borderColor:'rgba(83,74,183,0.5)', backgroundColor:'rgba(83,74,183,0.1)',
+              borderWidth:1.5, pointRadius:0, fill:true, tension:0
+            };
+          });
+        }
+        function mseRenderTable(rows) {
+          const mseVal = mseMean(rows);
+          let html = `<div class="table-wrap"><table>
+            <tr><th>공부시간</th><th>실제 점수</th><th>예측 점수</th><th>오차 (잔차)</th><th>오차²</th></tr>`;
+          rows.forEach(r => {
+            html += `<tr>
+              <td>${r.x}시간</td><td>${r.actual}</td><td>${r.pred}</td>
+              <td class="td-err">${r.err >= 0 ? '+' : ''}${r.err}</td>
+              <td class="td-sq">${r.sq}</td>
+            </tr>`;
+          });
+          html += `<tr class="total-row">
+            <td colspan="4" style="text-align:right;">합계 ÷ ${rows.length} =</td>
+            <td class="td-sq">MSE = <span style="color:var(--purple)">${mseVal}</span></td>
+          </tr></table></div>`;
+          document.getElementById('mse-table-area').innerHTML = html;
+        }
+
+        const chart = mkChart('mse-chart', 0, 8, 0, 11, '공부 시간', '시험 점수');
+        let mseTab = 0;
+        const meanY = parseFloat((MSE_DATA.reduce((s,p)=>s+p.y,0)/MSE_DATA.length).toFixed(2));
+
+        const MSETABS = [
+          {
+            label: '1단계 — 오차란?',
+            slider: false,
+            render() {
+              if (!chart) return;
+              const rows = MSE_DATA.map(p => ({ x:p.x, actual:p.y, pred:meanY }));
+              chart.data.datasets = [
+                lineDS(MSE_DATA.map(p => ({x:p.x, y:meanY})), '#aaa', [5,4], 1.5),
+                ...mseErrLineDS(rows),
+                dotDS(MSE_DATA.map(p => ({x:p.x, y:p.y})), '#534AB7')
+              ];
+              chart.update();
+              document.getElementById('mse-table-area').innerHTML = '';
+              renderStats('mse-stats', [
+                { label: '실제값 (점)', val: '파란 점' },
+                { label: '오차란?',    val: '예측 − 실제' },
+                { label: '문제',       val: '+/− 상쇄됨' }
+              ]);
+              document.getElementById('mse-formula').innerHTML = `<div class="formula">오차 = <span class="hl-t">예측값</span> − <span class="hl-p">실제값</span><br><br>문제: +3과 −3을 더하면 0 → 오차가 없는 것처럼 보임 😱</div>`;
+            },
+            explain: '모델이 예측한 값과 실제 정답의 차이를 오차라고 합니다. 그런데 오차에는 +(과대 예측)와 −(과소 예측)가 섞여 있어서, 그냥 합산하면 서로 상쇄되어 버려요. 오차가 크게 나도 합계가 0이 되는 문제가 생깁니다.'
+          },
+          {
+            label: '2단계 — 왜 제곱하나',
+            slider: false,
+            render() {
+              if (!chart) return;
+              const rows = mseCalcRows(OPT.m, OPT.b);
+              chart.data.datasets = [
+                lineDS([{x:0,y:OPT.b},{x:8,y:OPT.m*8+OPT.b}], '#1D9E75', [], 2),
+                ...mseSqBoxDS(rows),
+                ...mseErrLineDS(rows),
+                dotDS(MSE_DATA.map(p => ({x:p.x, y:p.y})), '#534AB7')
+              ];
+              chart.update();
+              document.getElementById('mse-table-area').innerHTML = '';
+              renderStats('mse-stats', [
+                { label: '제곱하면?',      val: '항상 양수' },
+                { label: '큰 오차 페널티', val: '더 크게 반영' },
+                { label: '보라 사각형',    val: '오차²의 넓이' }
+              ]);
+              document.getElementById('mse-formula').innerHTML = `<div class="formula">오차² = (<span class="hl-t">예측값</span> − <span class="hl-p">실제값</span>)²<br><br>• +3² = <span class="hl-c">9</span> &nbsp; −3² = <span class="hl-c">9</span> → 부호 문제 해결 ✅<br>• 오차 1² = 1 &nbsp; 오차 3² = <span class="hl-c">9</span> → 큰 오차에 더 큰 벌칙 ✅</div>`;
+            },
+            explain: '오차를 제곱하면 두 가지 문제가 동시에 해결돼요. 첫째, 음수가 사라져서 부호 상쇄 문제가 없어집니다. 둘째, 오차가 클수록 제곱값이 훨씬 커지기 때문에 큰 실수를 더 가혹하게 벌칙을 줄 수 있어요. 그래프의 보라색 사각형이 오차²를 면적으로 나타낸 거예요.'
+          },
+          {
+            label: '3단계 — MSE 계산',
+            slider: false,
+            render() {
+              if (!chart) return;
+              const rows = mseCalcRows(OPT.m, OPT.b);
+              const mseVal = mseMean(rows);
+              chart.data.datasets = [
+                lineDS([{x:0,y:OPT.b},{x:8,y:OPT.m*8+OPT.b}], '#1D9E75', [], 2),
+                ...mseErrLineDS(rows),
+                dotDS(MSE_DATA.map(p => ({x:p.x, y:p.y})), '#534AB7')
+              ];
+              chart.update();
+              mseRenderTable(rows);
+              renderStats('mse-stats', [
+                { label: '오차² 합계',  val: rows.reduce((s,r)=>s+r.sq,0).toFixed(2) },
+                { label: '데이터 개수', val: rows.length + '개' },
+                { label: 'MSE',        val: mseVal }
+              ]);
+              document.getElementById('mse-formula').innerHTML = `<div class="formula">MSE = <span class="hl-p">Σ(예측 − 실제)²</span> ÷ <span class="hl-t">n</span><br><br>= ${rows.reduce((s,r)=>s+r.sq,0).toFixed(2)} ÷ ${rows.length} = <span class="hl-p">${mseVal}</span></div>`;
+            },
+            explain: 'MSE(Mean Squared Error, 평균 제곱 오차)는 오차²의 평균입니다. 각 데이터마다 오차를 구해서 제곱하고, 그 값들을 모두 더한 뒤 데이터 개수로 나눈 것이에요. MSE가 작을수록 예측이 실제값에 가깝다는 뜻이고, 머신러닝 모델은 이 MSE를 최소화하는 방향으로 학습합니다.'
+          },
+          {
+            label: '4단계 — 직접 조절해보기',
+            slider: true,
+            render(m, b) {
+              if (!chart) return;
+              m = m !== undefined ? m : parseFloat(document.getElementById('mse-slope').value);
+              b = b !== undefined ? b : parseFloat(document.getElementById('mse-intercept').value);
+              const rows = mseCalcRows(m, b);
+              const mseVal = mseMean(rows);
+              const optRows = mseCalcRows(OPT.m, OPT.b);
+              const optMse = mseMean(optRows);
+              chart.data.datasets = [
+                lineDS([{x:0,y:OPT.b},{x:8,y:OPT.m*8+OPT.b}], 'rgba(29,158,117,0.3)', [5,4], 1.5),
+                lineDS([{x:0,y:b},{x:8,y:m*8+b}], '#534AB7', [], 2.5),
+                ...mseErrLineDS(rows),
+                dotDS(MSE_DATA.map(p => ({x:p.x, y:p.y})), '#D85A30', 7)
+              ];
+              chart.update();
+              document.getElementById('mse-table-area').innerHTML = '';
+              const better = mseVal <= optMse + 0.05;
+              renderStats('mse-stats', [
+                { label: '현재 MSE', val: mseVal },
+                { label: '최적 MSE', val: optMse },
+                { label: '상태',     val: better ? '✅ 최적에 가까움' : '📉 더 줄일 수 있음' }
+              ]);
+              document.getElementById('mse-formula').innerHTML = `<div class="formula">현재 MSE = <span class="hl-p">${mseVal}</span> &nbsp; 최적 MSE = <span class="hl-t">${optMse}</span><br><br>${better ? '🎉 최적선에 가까워졌어요!' : `MSE를 <span class="hl-t">${optMse}</span>까지 줄여보세요`}</div>`;
+            },
+            explain: '슬라이더로 예측선(파란 선)을 움직여보세요. 연한 초록 점선이 최적 회귀선입니다. 선이 데이터에서 멀어질수록 MSE가 커지고, 가까워질수록 MSE가 작아지는 걸 확인할 수 있어요. 머신러닝이 하는 일이 바로 이 MSE를 자동으로 최소화하는 선을 찾는 것입니다.'
+          }
+        ];
+
+        const mseTabRow = document.getElementById('mse-tabs');
+        if (mseTabRow) {
+          MSETABS.forEach((t, i) => {
+            const b = document.createElement('button');
+            b.className = 'tab-btn' + (i === 0 ? ' active' : '');
+            b.textContent = t.label;
+            b.onclick = () => setMseTab(i);
+            mseTabRow.appendChild(b);
+          });
+        }
+
+        function setMseTab(i) {
+          mseTab = i;
+          if (mseTabRow) mseTabRow.querySelectorAll('.tab-btn').forEach((b, j) => b.classList.toggle('active', j === i));
+          const t = MSETABS[i];
+          document.getElementById('mse-slider-area').style.display = t.slider ? 'block' : 'none';
+          t.render();
+          document.getElementById('mse-explain').textContent = t.explain;
+        }
+
+        ['mse-slope', 'mse-intercept'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) {
+            el.addEventListener('input', function() {
+              document.getElementById(id + '-v').textContent = parseFloat(this.value).toFixed(id === 'mse-slope' ? 2 : 1);
+              if (mseTab === 3) MSETABS[3].render();
+            });
+          }
+        });
+        setMseTab(0);
       }
 
     });
