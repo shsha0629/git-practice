@@ -371,6 +371,41 @@
       color: var(--purple); 
     }
 
+    .compare-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .compare-card {
+      border-radius: 8px;
+      padding: 12px 14px;
+    }
+    .compare-card.euc {
+      background: rgba(29,158,117,0.08);
+      border: 1px solid rgba(29,158,117,0.25);
+    }
+    .compare-card.man {
+      background: rgba(83,74,183,0.08);
+      border: 1px solid rgba(83,74,183,0.25);
+    }
+    .compare-title {
+      font-size: 11px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+    .compare-card.euc .compare-title { color: var(--teal); }
+    .compare-card.man .compare-title { color: var(--purple); }
+    .compare-val {
+      font-size: 20px;
+      font-weight: 500;
+    }
+    .compare-desc {
+      font-size: 11px;
+      color: var(--text2);
+      margin-top: 2px;
+    }
+
   </style>
 </head>
 <body>
@@ -403,6 +438,11 @@
         <div class="menu-card-title">MSE (평균 제곱 오차)</div>
         <div class="menu-card-desc">오차를 제곱하는 이유, 계산 방법, 최솟값 찾기</div>
         <div class="menu-card-url">#mse</div>
+      </a>
+      <a class="menu-card" href="#manhattan">
+        <div class="menu-card-title">맨해튼 거리</div>
+        <div class="menu-card-desc">격자 위 블록 이동 거리, 유클리드와 비교, 여러 경로</div>
+        <div class="menu-card-url">#manhattan</div>
       </a>
     </div>
   </div>
@@ -518,6 +558,32 @@
     <div class="stat-row" id="mse-stats"></div>
     <div id="mse-formula"></div>
     <div class="explain-box" id="mse-explain"></div>
+  </div>
+
+  <div id="page-manhattan" class="graph-section">
+    <h2>맨해튼 거리</h2>
+    <p class="subtitle">격자(바둑판) 위에서 가로 + 세로로만 이동한 총 칸 수</p>
+    <div class="tab-row" id="man-tabs"></div>
+    <div class="canvas-wrap">
+      <canvas id="man-chart" role="img" aria-label="맨해튼 거리 좌표 평면 그래프"></canvas>
+    </div>
+    <div id="man-slider-area" style="display:none;">
+      <div class="slider-grid">
+        <div>
+          <div style="font-size:11px;color:var(--text2);margin-bottom:4px;">점 A</div>
+          <div class="sl-row"><label>x₁</label><input type="range" id="max" min="1" max="7" step="1" value="1"><span class="sl-val" id="max-v">1</span></div>
+          <div class="sl-row"><label>y₁</label><input type="range" id="may" min="1" max="7" step="1" value="1"><span class="sl-val" id="may-v">1</span></div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--text2);margin-bottom:4px;">점 B</div>
+          <div class="sl-row"><label>x₂</label><input type="range" id="mbx" min="1" max="7" step="1" value="6"><span class="sl-val" id="mbx-v">6</span></div>
+          <div class="sl-row"><label>y₂</label><input type="range" id="mby" min="1" max="7" step="1" value="5"><span class="sl-val" id="mby-v">5</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="stat-row" id="man-stats"></div>
+    <div id="man-formula"></div>
+    <div class="explain-box" id="man-explain"></div>
   </div>
 
   <script>
@@ -1214,6 +1280,174 @@
           }
         });
         setMseTab(0);
+      }
+
+      // MANHATTAN DISTANCE
+      if (param === 'manhattan') {
+        function manDist(ax, ay, bx, by) { return Math.abs(bx - ax) + Math.abs(by - ay); }
+        function eucDist(ax, ay, bx, by) { return Math.sqrt((bx - ax) ** 2 + (by - ay) ** 2); }
+
+        const chart = mkChart('man-chart', 0, 8, 0, 8, '', '');
+        let manTab = 0;
+
+        const MANTABS = [
+          {
+            label: '1단계 — 직선 vs 블록',
+            slider: false,
+            render() {
+              if (!chart) return;
+              const [ax, ay, bx, by] = [1, 1, 6, 5];
+              chart.data.datasets = [
+                lineDS([{ x: ax, y: ay }, { x: bx, y: by }], '#1D9E75', [], 2),
+                lineDS([{ x: ax, y: ay }, { x: bx, y: ay }, { x: bx, y: by }], '#534AB7', [], 2.5),
+                dotDS([{ x: ax, y: ay }], '#534AB7'),
+                dotDS([{ x: bx, y: by }], '#D85A30'),
+                dotDS([{ x: bx, y: ay }], '#aaa', 4)
+              ];
+              chart.update();
+            },
+            stats: [
+              { label: 'A→B 직선 (유클리드)', val: eucDist(1, 1, 6, 5).toFixed(2) },
+              { label: 'A→B 블록 (맨해튼)', val: manDist(1, 1, 6, 5) },
+              { label: '차이', val: (manDist(1, 1, 6, 5) - eucDist(1, 1, 6, 5)).toFixed(2) + ' 더 큼' }
+            ],
+            formula: '',
+            explain: '유클리드 거리는 A에서 B까지 직선으로 가는 거리예요. 하지만 실제 도시에서는 건물 때문에 직선으로 이동할 수 없어요. 블록을 따라 가로→세로로만 이동해야 하는데, 이것이 맨해튼 거리입니다. 뉴욕 맨해튼의 격자형 도로에서 이름을 따왔어요.'
+          },
+          {
+            label: '2단계 — 공식 이해',
+            slider: false,
+            render() {
+              if (!chart) return;
+              const [ax, ay, bx, by] = [1, 1, 6, 5];
+              const dx = bx - ax, dy = by - ay;
+              chart.data.datasets = [
+                lineDS([{ x: ax, y: ay }, { x: bx, y: ay }], '#D85A30', [5, 4], 2),
+                lineDS([{ x: bx, y: ay }, { x: bx, y: by }], '#534AB7', [5, 4], 2),
+                lineDS([{ x: ax, y: ay }, { x: bx, y: ay }, { x: bx, y: by }], '#534AB7', [], 2.5),
+                dotDS([{ x: ax, y: ay }], '#534AB7'),
+                dotDS([{ x: bx, y: by }], '#D85A30'),
+                dotDS([{ x: bx, y: ay }], '#888', 4)
+              ];
+              chart.update();
+              document.getElementById('man-formula').innerHTML = `<div class="formula">맨해튼 거리 = <span class="hl-c">|Δx|</span> + <span class="hl-p">|Δy|</span><br>= <span class="hl-c">|${bx}−${ax}|</span> + <span class="hl-p">|${by}−${ay}|</span><br>= <span class="hl-c">${Math.abs(dx)}</span> + <span class="hl-p">${Math.abs(dy)}</span> = <span style="font-weight:600">${manDist(ax, ay, bx, by)}</span><br><br>cf. 유클리드: √(<span class="hl-c">${Math.abs(dx)}²</span>+<span class="hl-p">${Math.abs(dy)}²</span>) = ${eucDist(ax, ay, bx, by).toFixed(2)}</div>`;
+            },
+            stats: [
+              { label: '|Δx| 가로 이동', val: '|6−1| = 5' },
+              { label: '|Δy| 세로 이동', val: '|5−1| = 4' },
+              { label: '맨해튼 거리', val: manDist(1, 1, 6, 5) }
+            ],
+            formula: '',
+            explain: '맨해튼 거리 공식은 간단해요. 가로로 몇 칸, 세로로 몇 칸 이동했는지를 더하면 됩니다. 절댓값(|  |)을 쓰는 이유는 이동 방향(+/−)에 관계없이 칸 수만 세기 위해서예요. 유클리드처럼 제곱하고 루트를 씌울 필요 없이 더하기만 하면 돼서 계산이 훨씬 빠릅니다.'
+          },
+          {
+            label: '3단계 — 여러 경로',
+            slider: false,
+            render() {
+              if (!chart) return;
+              const [ax, ay, bx, by] = [1, 1, 6, 5];
+              chart.data.datasets = [
+                lineDS([{ x: ax, y: ay }, { x: bx, y: ay }, { x: bx, y: by }], 'rgba(83,74,183,0.9)', [], 2.5),
+                lineDS([{ x: ax, y: ay }, { x: ax, y: by }, { x: bx, y: by }], 'rgba(216,90,48,0.9)', [], 2.5),
+                lineDS([{ x: ax, y: ay }, { x: 3, y: ay }, { x: 3, y: 3 }, { x: bx, y: 3 }, { x: bx, y: by }], 'rgba(29,158,117,0.9)', [], 2.5),
+                dotDS([{ x: ax, y: ay }], '#1a1a1a', 9),
+                dotDS([{ x: bx, y: by }], '#1a1a1a', 9)
+              ];
+              chart.update();
+              document.getElementById('man-formula').innerHTML = `<div class="formula">세 경로 모두 거리 = <span class="hl-p">${manDist(ax, ay, bx, by)}</span><br><br>어떤 경로로 가도 <span class="hl-p">|Δx| + |Δy|</span> 는 항상 같아요 ✅</div>`;
+            },
+            stats: [
+              { label: '보라 경로 거리', val: manDist(1, 1, 6, 5) },
+              { label: '주황 경로 거리', val: manDist(1, 1, 6, 5) },
+              { label: '초록 경로 거리', val: manDist(1, 1, 6, 5) }
+            ],
+            formula: '',
+            explain: '맨해튼의 신기한 성질: 같은 두 점 사이를 격자 위에서 이동할 때, 어떤 경로를 선택하든 총 이동 거리는 항상 같아요. 지그재그로 가도, 한 번에 꺾어 가도 결과가 같습니다. 가로 이동량과 세로 이동량의 합이 달라지지 않기 때문이에요.'
+          },
+          {
+            label: '4단계 — 직접 움직여보기',
+            slider: true,
+            render(ax, ay, bx, by) {
+              if (!chart) return;
+              ax = ax || 1; ay = ay || 1; bx = bx || 6; by = by || 5;
+              const dx = Math.abs(bx - ax), dy = Math.abs(by - ay);
+              chart.data.datasets = [
+                lineDS([{ x: ax, y: ay }, { x: bx, y: by }], 'rgba(29,158,117,0.35)', [5, 4], 1.5),
+                lineDS([{ x: ax, y: ay }, { x: bx, y: ay }, { x: bx, y: by }], '#534AB7', [], 2.5),
+                dotDS([{ x: ax, y: ay }], '#534AB7'),
+                dotDS([{ x: bx, y: by }], '#D85A30'),
+                dotDS([{ x: bx, y: ay }], '#aaa', 4)
+              ];
+              chart.update();
+              document.getElementById('man-stats').innerHTML = `
+                <div class="compare-row">
+                  <div class="compare-card euc">
+                    <div class="compare-title">유클리드 거리 (직선)</div>
+                    <div class="compare-val">${eucDist(ax, ay, bx, by).toFixed(2)}</div>
+                    <div class="compare-desc">√(${dx}² + ${dy}²)</div>
+                  </div>
+                  <div class="compare-card man">
+                    <div class="compare-title">맨해튼 거리 (블록)</div>
+                    <div class="compare-val">${manDist(ax, ay, bx, by)}</div>
+                    <div class="compare-desc">${dx} + ${dy}</div>
+                  </div>
+                </div>`;
+              document.getElementById('man-formula').innerHTML = `<div class="formula">맨해튼 = <span class="hl-c">|${bx}−${ax}|</span> + <span class="hl-p">|${by}−${ay}|</span> = <span class="hl-c">${dx}</span> + <span class="hl-p">${dy}</span> = <span style="font-weight:600">${manDist(ax, ay, bx, by)}</span></div>`;
+            },
+            stats: [],
+            formula: '',
+            explain: '슬라이더로 두 점을 움직여보세요. 같은 두 점이라도 맨해튼 거리는 항상 유클리드 거리보다 크거나 같아요. 두 점이 일직선(가로 또는 세로)에 놓일 때만 두 거리가 같아집니다.'
+          }
+        ];
+
+        const manTabRow = document.getElementById('man-tabs');
+        if (manTabRow) {
+          MANTABS.forEach((t, i) => {
+            const b = document.createElement('button');
+            b.className = 'tab-btn' + (i === 0 ? ' active' : '');
+            b.textContent = t.label;
+            b.onclick = () => setManTab(i);
+            manTabRow.appendChild(b);
+          });
+        }
+
+        function setManTab(i) {
+          manTab = i;
+          if (manTabRow) manTabRow.querySelectorAll('.tab-btn').forEach((b, j) => b.classList.toggle('active', j === i));
+          const t = MANTABS[i];
+          document.getElementById('man-slider-area').style.display = t.slider ? 'block' : 'none';
+          if (t.slider) {
+            t.render(
+              parseInt(document.getElementById('max').value),
+              parseInt(document.getElementById('may').value),
+              parseInt(document.getElementById('mbx').value),
+              parseInt(document.getElementById('mby').value)
+            );
+          } else {
+            t.render();
+            renderStats('man-stats', t.stats);
+            document.getElementById('man-formula').innerHTML = t.formula ? `<div class="formula">${t.formula}</div>` : '';
+          }
+          document.getElementById('man-explain').textContent = t.explain;
+        }
+
+        ['max', 'may', 'mbx', 'mby'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) {
+            el.addEventListener('input', function () {
+              document.getElementById(id + '-v').textContent = this.value;
+              if (manTab === 3) {
+                MANTABS[3].render(
+                  parseInt(document.getElementById('max').value),
+                  parseInt(document.getElementById('may').value),
+                  parseInt(document.getElementById('mbx').value),
+                  parseInt(document.getElementById('mby').value)
+                );
+              }
+            });
+          }
+        });
+        setManTab(0);
       }
 
     });
